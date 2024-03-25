@@ -25,27 +25,26 @@ class ImportCardCommand extends Command
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly LoggerInterface        $logger,
-        private array                           $csvHeader = []
-    )
-    {
+        private readonly LoggerInterface $logger,
+        private array $csvHeader = []
+    ) {
         parent::__construct();
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         ini_set('memory_limit', '2G');
-        // On récupère le temps actuel
         $io = new SymfonyStyle($input, $output);
         $filepath = __DIR__ . '/../../data/cards.csv';
         $handle = fopen($filepath, 'r');
 
-        // On récupère le temps actuel
         $start = microtime(true);
+        $this->logger->info('Start timer : ' . $start);
 
         $this->logger->info('Importing cards from ' . $filepath);
         if ($handle === false) {
             $io->error('File not found');
+            $this->logger->error('File not found');
             return Command::FAILURE;
         }
 
@@ -63,21 +62,25 @@ class ImportCardCommand extends Command
                 $this->addCard($row);
             }
 
+            if ($i > 10000) {
+                break;
+            }
+
             if ($i % 2000 === 0) {
                 $this->entityManager->flush();
                 $this->entityManager->clear();
                 $progressIndicator->advance();
             }
         }
-        // Toujours flush en sorti de boucle
         $this->entityManager->flush();
         $progressIndicator->finish('Importing cards done.');
 
         fclose($handle);
 
-        // On récupère le temps actuel, et on calcule la différence avec le temps de départ
         $end = microtime(true);
+        $this->logger->info('End timer : ' . $end);
         $timeElapsed = $end - $start;
+        $this->logger->info('Time elapsed : ' . $timeElapsed);
         $io->success(sprintf('Imported %d cards in %.2f seconds', $i, $timeElapsed));
         return Command::SUCCESS;
     }
@@ -106,6 +109,5 @@ class ImportCardCommand extends Command
         $card->setText($row['text']);
         $card->setType($row['type']);
         $this->entityManager->persist($card);
-
     }
 }
